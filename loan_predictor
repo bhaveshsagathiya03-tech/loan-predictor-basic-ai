@@ -1,0 +1,53 @@
+import pandas as pd
+import joblib
+
+# Load model
+obj = joblib.load("loan_model.pkl")
+model = obj["model"]
+expected_cols = obj["columns"]
+
+# Load CSV
+df = pd.read_csv("loan_data.csv")
+
+print("Total applicants in CSV =", len(df))
+row_num = int(input("Enter row number (0 to {}): ".format(len(df)-1)))
+
+# Extract that applicant’s real data
+person = df.iloc[row_num]
+print("\nSelected REAL applicant from your dataset:\n")
+print(person)
+
+# Drop target column (loan_status)
+X = person.drop(labels=["loan_status"], errors="ignore")
+
+# Preprocessing (same as training)
+df_new = pd.DataFrame([X])
+
+for col in df_new.columns:
+    if df_new[col].dtype == "O":
+        df_new[col] = df_new[col].fillna("Unknown")
+    else:
+        df_new[col] = df_new[col].fillna(df_new[col].median())
+
+df_new = pd.get_dummies(df_new, drop_first=True)
+
+# Add missing columns that model expects
+for c in expected_cols:
+    if c not in df_new.columns:
+        df_new[c] = 0
+
+# Reorder columns
+df_new = df_new[expected_cols]
+
+# Predict
+pred = model.predict(df_new)[0]
+prob = model.predict_proba(df_new)[0] if hasattr(model, "predict_proba") else None
+
+print("\n=== MODEL DECISION ===")
+if pred == 1:
+    print("Loan APPROVED ✔️")
+else:
+    print("Loan REJECTED ❌")
+
+if prob is not None:
+    print("Reject prob:", round(prob[0], 3), " | Approve prob:", round(prob[1], 3))
